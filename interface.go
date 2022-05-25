@@ -15,10 +15,12 @@ func New(w io.Writer, title string, flag int, level level, separator string) *lo
 	}
 }
 
-func NewDefault(title string) *logger {
+func NewDefault(title string, l ...level) *logger {
 	var lvl level
 	if value, ok := os.LookupEnv("DEBUG"); ok && value == "1" {
 		lvl = DEBUG
+	} else if len(l) > 0 {
+		lvl = l[0]
 	} else {
 		lvl = WARNING
 	}

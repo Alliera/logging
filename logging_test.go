@@ -19,60 +19,60 @@ func (w *WriterMock) Write(p []byte) (n int, err error) {
 }
 
 func TestNewDefault(t *testing.T) {
-	logger := NewDefault("")
+	l := NewDefault("")
 
-	if logger.w != os.Stdout {
+	if l.w != os.Stdout {
 		t.Errorf("Output direction must be Stdout")
 	}
-	if logger.level != WARNING && logger.level != DEBUG {
-		t.Errorf("Log level must be WARNING or DEBUG, has: %v", logger.level)
+	if l.level != WARNING && l.level != DEBUG {
+		t.Errorf("Log level must be WARNING or DEBUG, has: %v", l.level)
 	}
 }
 
 func TestSetFlags(t *testing.T) {
-	logger := logger{}
-	logger.SetFlags(Date | Date)
-	assert.Equal(t, Date, logger.flag)
-	logger.SetFlags(Date | Time)
-	assert.Equal(t, Date|Time, logger.flag)
-	logger.SetFlags(ShortCaller)
-	assert.Equal(t, Date|Time|ShortCaller, logger.flag)
+	l := logger{}
+	l.SetFlags(Date | Date)
+	assert.Equal(t, Date, l.flag)
+	l.SetFlags(Date | Time)
+	assert.Equal(t, Date|Time, l.flag)
+	l.SetFlags(ShortCaller)
+	assert.Equal(t, Date|Time|ShortCaller, l.flag)
 }
 
 func TestUnsetFlags(t *testing.T) {
-	logger := logger{}
-	logger.SetFlags(Date | Time | Labels | Caller | ShortCaller)
-	logger.UnsetFlags(Time)
-	assert.Equal(t, Date|Labels|Caller|ShortCaller, logger.flag)
-	logger.UnsetFlags(Labels | Caller)
-	assert.Equal(t, Date|ShortCaller, logger.flag)
-	logger.UnsetFlags(Labels)
-	assert.Equal(t, Date|ShortCaller, logger.flag)
+	l := logger{}
+	l.SetFlags(Date | Time | Labels | Caller | ShortCaller)
+	l.UnsetFlags(Time)
+	assert.Equal(t, Date|Labels|Caller|ShortCaller, l.flag)
+	l.UnsetFlags(Labels | Caller)
+	assert.Equal(t, Date|ShortCaller, l.flag)
+	l.UnsetFlags(Labels)
+	assert.Equal(t, Date|ShortCaller, l.flag)
 }
 
 func TestIsLevelHigherThanDefault(t *testing.T) {
-	logger := logger{}
-	logger.level = FATAL
-	assert.False(t, logger.isLevelHigherThanDefault(DEBUG))
-	logger.level = DEBUG
-	assert.True(t, logger.isLevelHigherThanDefault(DEBUG))
-	logger.level = DEBUG
-	assert.True(t, logger.isLevelHigherThanDefault(FATAL))
+	l := logger{}
+	l.level = FATAL
+	assert.False(t, l.isLevelHigherThanDefault(DEBUG))
+	l.level = DEBUG
+	assert.True(t, l.isLevelHigherThanDefault(DEBUG))
+	l.level = DEBUG
+	assert.True(t, l.isLevelHigherThanDefault(FATAL))
 }
 
 func TestLogNoFlags(t *testing.T) {
 	w := WriterMock{}
 	msg := "this is info message"
 	w.On("Write", []byte(fmt.Sprintf("(title)  [INFO]  %s\n", msg)))
-	logger := logger{title: "title", w: &w}
-	logger.log(INFO, msg)
+	l := logger{title: "title", w: &w}
+	l.log(INFO, msg)
 	w.AssertExpectations(t)
 }
 
 func TestLogWithFlags(t *testing.T) {
 	w := WriterMock{}
-	logger := logger{title: "title", w: &w}
-	logger.SetFlags(Date | Time | Labels)
+	l := logger{title: "title", w: &w}
+	l.SetFlags(Date | Time | Labels)
 
 	msg := "this is info message"
 	now := time.Now()
@@ -85,7 +85,7 @@ func TestLogWithFlags(t *testing.T) {
 		msg,
 	)))
 
-	logger.Info(msg)
+	l.Info(msg)
 	w.AssertExpectations(t)
 }
 
@@ -97,16 +97,16 @@ func TestDifferentLogLevels(t *testing.T) {
 	w.On("Write", []byte("[ERROR]  msg\n"))
 	w.On("Write", []byte("[INFO]  msg\n"))
 
-	logger := logger{level: WARNING, w: &w}
-	logger.Warning("msg")
-	logger.Debug("msg")
-	logger.Error("msg")
-	logger.level = ERROR
-	logger.Error("msg")
-	logger.Debug("msg")
-	logger.Info("msg")
-	logger.level = INFO
-	logger.Info("msg")
+	l := logger{level: WARNING, w: &w}
+	l.Warning("msg")
+	l.Debug("msg")
+	l.Error("msg")
+	l.level = ERROR
+	l.Error("msg")
+	l.Debug("msg")
+	l.Info("msg")
+	l.level = INFO
+	l.Info("msg")
 
 	w.AssertNumberOfCalls(t, "Write", 4)
 }
