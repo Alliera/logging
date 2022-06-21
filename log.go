@@ -42,6 +42,7 @@ type level string
 type callInfo struct {
 	file string
 	line int
+	pc   uintptr
 }
 
 type logger struct {
@@ -55,12 +56,12 @@ type logger struct {
 
 func getCallInfo() callInfo {
 	// skip 3 frames from stack to get right caller
-	_, file, line, ok := runtime.Caller(3)
+	pc, file, line, ok := runtime.Caller(3)
 	if !ok {
 		file = sourceErr
 		line = -1
 	}
-	return callInfo{file: file, line: line}
+	return callInfo{file: file, line: line, pc: pc}
 }
 
 func (l *logger) isLevelHigherThanDefault(currentLevel level) bool {
@@ -150,4 +151,14 @@ func (l *logger) log(level level, msg string) {
 		}
 	}
 	_, _ = l.w.Write(data)
+}
+
+func getMsgFromError(err error) (msg string) {
+	switch t := err.(type) {
+	case TraceableError:
+		msg = t.GetTrace()
+	default:
+		msg = err.Error()
+	}
+	return msg
 }

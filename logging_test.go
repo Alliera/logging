@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -109,4 +110,27 @@ func TestDifferentLogLevels(t *testing.T) {
 	l.Info("msg")
 
 	w.AssertNumberOfCalls(t, "Write", 4)
+}
+
+func TestTrace(t *testing.T) {
+	assert.Equal(t, nil, Trace(nil))
+
+	msg := "asdasdasd"
+	err := errors.New(msg)
+
+	tracedErr := Trace(err)
+	assert.NotEqual(t, nil, tracedErr)
+	assert.Equal(t, msg, tracedErr.Error())
+
+	traceableErr, ok := tracedErr.(TraceableError)
+	assert.True(t, ok)
+	assert.Equal(t, 2, len(traceableErr.GetAllStackFrames()))
+
+	tracedTracedErr := Trace(tracedErr)
+	assert.NotEqual(t, nil, tracedTracedErr)
+	assert.Equal(t, msg, tracedTracedErr.Error())
+
+	traceableErr, ok = tracedTracedErr.(TraceableError)
+	assert.True(t, ok)
+	assert.Equal(t, 3, len(traceableErr.GetAllStackFrames()))
 }
