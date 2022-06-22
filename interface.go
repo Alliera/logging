@@ -82,3 +82,28 @@ func (l *logger) Fatal(msg string) {
 	l.log(FATAL, msg)
 	os.Exit(1)
 }
+
+func (l *logger) LogError(err error) {
+	if err == nil {
+		return
+	}
+	l.log(ERROR, getMsgFromError(err))
+}
+
+func (l *logger) LogFatal(err error) {
+	if err == nil {
+		return
+	}
+	l.log(FATAL, getMsgFromError(err))
+	os.Exit(1)
+}
+
+func Trace(err error) error {
+	if err == nil {
+		return nil
+	}
+	trErr := new(traceableError)
+	trErr.err = err
+	trErr.frame = trErr.getCurrentStackFrame()
+	return trErr
+}
