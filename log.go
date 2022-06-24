@@ -3,10 +3,11 @@ package logging
 import (
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"sync"
+	"strings"
 	"time"
 )
 
@@ -46,7 +47,6 @@ type callInfo struct {
 }
 
 type logger struct {
-	mu        sync.Mutex
 	title     string
 	separator string
 	level     level
@@ -54,9 +54,14 @@ type logger struct {
 	w         io.Writer
 }
 
+var (
+	exit   = os.Exit
+	caller = runtime.Caller
+)
+
 func getCallInfo() callInfo {
 	// skip 3 frames from stack to get right caller
-	pc, file, line, ok := runtime.Caller(3)
+	pc, file, line, ok := caller(3)
 	if !ok {
 		file = sourceErr
 		line = -1
@@ -153,12 +158,11 @@ func (l *logger) log(level level, msg string) {
 	_, _ = l.w.Write(data)
 }
 
-func getMsgFromError(err error) (msg string) {
-	switch t := err.(type) {
-	case TraceableError:
-		msg = t.GetTrace()
-	default:
-		msg = err.Error()
+func (l *logger) getMsgFromError(err error, s []string) (msg string) {
+	parts := append([]string{err.Error()}, s...)
+	msg = strings.Join(parts, " "+l.separator+" ")
+	if t, ok := err.(TraceableError); ok {
+		msg = fmt.Sprintf("%s\n%s", msg, t.GetTrace())
 	}
-	return msg
+	return
 }

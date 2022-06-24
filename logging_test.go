@@ -20,14 +20,58 @@ func (w *WriterMock) Write(p []byte) (n int, err error) {
 }
 
 func TestNewDefault(t *testing.T) {
-	l := NewDefault("")
+	var l *logger
 
-	if l.w != os.Stdout {
-		t.Errorf("Output direction must be Stdout")
+	l = NewDefault("")
+	assert.Equal(t, os.Stdout, l.w)
+	assert.Equal(t, WARNING, l.level)
+
+	t.Setenv("DEBUG", "1")
+	l = NewDefault("")
+	assert.Equal(t, DEBUG, l.level)
+	l = NewDefault("", ERROR)
+	assert.Equal(t, DEBUG, l.level)
+
+	t.Setenv("DEBUG", "")
+	l = NewDefault("")
+	assert.Equal(t, WARNING, l.level)
+	l = NewDefault("", FATAL)
+	assert.Equal(t, FATAL, l.level)
+}
+
+func TestSetSeparator(t *testing.T) {
+	w := WriterMock{}
+	l := logger{level: DEBUG, w: &w}
+	msg := "asdasd"
+
+	w.On("Write", []byte(fmt.Sprintf("[WARNING]  %s\n", msg)))
+	l.Warning(msg)
+
+	l.SetSeparator(DefaultSeparator)
+	w.On("Write", []byte(fmt.Sprintf("[WARNING] -- %s\n", msg)))
+	l.Warning(msg)
+
+	l.SetSeparator("|")
+	w.On("Write", []byte(fmt.Sprintf("[WARNING] | %s\n", msg)))
+	l.Warning(msg)
+
+	w.AssertNumberOfCalls(t, "Write", 3)
+	w.AssertExpectations(t)
+}
+
+func TestGetCallerInfo(t *testing.T) {
+	l := New(&WriterMock{}, "test", Labels|Caller, DEBUG, DefaultSeparator)
+	ci := callInfo{
+		file: "/dev/null",
+		line: 42,
+		pc:   0,
 	}
-	if l.level != WARNING && l.level != DEBUG {
-		t.Errorf("Log level must be WARNING or DEBUG, has: %v", l.level)
-	}
+	i := string(l.getCallerInfo(ci))
+	assert.Equal(t, "SRC = /dev/null:42 -- ", i)
+	l.UnsetFlags(Caller)
+	l.SetFlags(ShortCaller)
+	i = string(l.getCallerInfo(ci))
+	assert.Equal(t, "SRC = null:42 -- ", i)
 }
 
 func TestSetFlags(t *testing.T) {
@@ -70,6 +114,15 @@ func TestLogNoFlags(t *testing.T) {
 	w.AssertExpectations(t)
 }
 
+func TestLogEmptyNoFlags(t *testing.T) {
+	w := WriterMock{}
+	msg := ""
+	w.On("Write", []byte("(title)  [INFO]  Unknown error\n"))
+	l := logger{title: "title", w: &w}
+	l.log(INFO, msg)
+	w.AssertExpectations(t)
+}
+
 func TestLogWithFlags(t *testing.T) {
 	w := WriterMock{}
 	l := logger{title: "title", w: &w}
@@ -102,11 +155,11 @@ func TestDifferentLogLevels(t *testing.T) {
 	l.Warning("msg")
 	l.Debug("msg")
 	l.Error("msg")
-	l.level = ERROR
+	l.SetLevel(ERROR)
 	l.Error("msg")
 	l.Debug("msg")
 	l.Info("msg")
-	l.level = INFO
+	l.SetLevel(INFO)
 	l.Info("msg")
 
 	w.AssertNumberOfCalls(t, "Write", 4)
@@ -133,4 +186,107 @@ func TestTrace(t *testing.T) {
 	traceableErr, ok = tracedTracedErr.(TraceableError)
 	assert.True(t, ok)
 	assert.Equal(t, 3, len(traceableErr.GetAllStackFrames()))
+}
+
+func TestLogError(t *testing.T) {
+	l := NewDefault("test").UnsetFlags(ShortCaller)
+	w := &WriterMock{}
+	l.SetWriter(w)
+
+	l.LogError(nil)
+
+	w.On("Write", []byte("(test) -- [ERROR] -- some error\n"))
+	w.On("Write", []byte("(test) -- [ERROR] -- some error -- some info\n"))
+	w.On("Write", []byte("(test) -- [ERROR] -- some error -- some info -- more info\n"))
+
+	err := errors.New("some error")
+	l.LogError(err)
+	l.LogError(err, "some info")
+	l.LogError(err, "some info", "more info")
+
+	w.AssertNumberOfCalls(t, "Write", 3)
+}
+
+func TestFatal(t *testing.T) {
+	l := NewDefault("test").UnsetFlags(ShortCaller)
+	w := &WriterMock{}
+	l.SetWriter(w)
+
+	exit = func(i int) {}
+	w.On("Write", []byte("(test) -- [FATAL] -- some error\n"))
+	l.Fatal("some error")
+	w.AssertExpectations(t)
+	w.AssertNumberOfCalls(t, "Write", 1)
+}
+
+func TestLogFatal(t *testing.T) {
+	l := NewDefault("test").UnsetFlags(ShortCaller)
+	w := &WriterMock{}
+	l.SetWriter(w)
+
+	exit = func(i int) {}
+	l.LogFatal(nil)
+	w.On("Write", []byte("(test) -- [FATAL] -- some error\n"))
+	err := errors.New("some error")
+	l.LogFatal(err)
+	w.AssertExpectations(t)
+	w.AssertNumberOfCalls(t, "Write", 1)
+}
+
+func TestLogErrorTraceableError(t *testing.T) {
+	l := NewDefault("test").UnsetFlags(ShortCaller)
+	w := &WriterMock{}
+	l.SetWriter(w)
+
+	w.On("Write", []byte("(test) -- [ERROR] -- some error\nfake frame\n\terror occurred: some error\n"))
+	w.On("Write", []byte("(test) -- [ERROR] -- some error -- some info\nfake frame\n\terror occurred: some error\n"))
+	w.On("Write", []byte("(test) -- [ERROR] -- some error -- some info -- more info\nfake frame\n\terror occurred: some error\n"))
+	w.On("Write", []byte("(test) -- [ERROR] -- unknown (unspecified) error\nfake frame\n\terror occurred: unknown (unspecified) error\n"))
+
+	var err *traceableError
+
+	err = &traceableError{
+		err:   errors.New("some error"),
+		frame: "fake frame",
+	}
+
+	l.LogError(err)
+	l.LogError(err, "some info")
+	l.LogError(err, "some info", "more info")
+
+	err = &traceableError{frame: "fake frame"}
+	l.LogError(err)
+
+	w.AssertNumberOfCalls(t, "Write", 4)
+}
+
+func TestGetCallInfo(t *testing.T) {
+	caller = func(i int) (pc uintptr, file string, line int, ok bool) {
+		return 0, "/dev/null", 42, true
+	}
+	ci := getCallInfo()
+	assert.Equal(t, callInfo{file: "/dev/null", line: 42, pc: 0}, ci)
+
+	caller = func(i int) (pc uintptr, file string, line int, ok bool) { return }
+	ci = getCallInfo()
+	assert.Equal(t, callInfo{file: sourceErr, line: -1, pc: 0}, ci)
+}
+
+func TestGetCurrentStackFrame(t *testing.T) {
+	var (
+		frame string
+		err   traceableError
+	)
+
+	caller = func(i int) (pc uintptr, file string, line int, ok bool) {
+		return 0, "/dev/null", 42, true
+	}
+	frame = err.getCurrentStackFrame()
+	assert.Equal(t, "unknown stack frame", frame)
+
+	caller = func(i int) (pc uintptr, file string, line int, ok bool) {
+		return 1, "/dev/null", 42, true
+	}
+	frame = err.getCurrentStackFrame()
+	assert.Equal(t, "\t/dev/null:42", frame)
 }

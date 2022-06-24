@@ -14,8 +14,7 @@ const (
 	WARNING level = "WARNING"
 	ERROR   level = "ERROR"
 	FATAL   level = "FATAL"
-)
 
-const (
-	sourceErr = "UNKNOWN_SOURCE_ERROR"
+	DefaultSeparator = "--"
+	sourceErr        = "UNKNOWN_SOURCE_ERROR"
 )

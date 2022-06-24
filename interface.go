@@ -24,40 +24,30 @@ func NewDefault(title string, l ...level) *logger {
 	} else {
 		lvl = WARNING
 	}
-	return New(os.Stdout, title, ShortCaller, lvl, "--")
+	return New(os.Stdout, title, ShortCaller, lvl, DefaultSeparator)
 }
 
 func (l *logger) SetWriter(w io.Writer) *logger {
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	l.w = w
 	return l
 }
 
 func (l *logger) SetFlags(flag int) *logger {
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	l.flag = l.flag | flag
 	return l
 }
 
 func (l *logger) UnsetFlags(flag int) *logger {
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	l.flag = l.flag &^ flag
 	return l
 }
 
 func (l *logger) SetSeparator(separator string) *logger {
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	l.separator = separator
 	return l
 }
 
 func (l *logger) SetLevel(level level) *logger {
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	l.level = level
 	return l
 }
@@ -80,22 +70,22 @@ func (l *logger) Error(msg string) {
 
 func (l *logger) Fatal(msg string) {
 	l.log(FATAL, msg)
-	os.Exit(1)
+	exit(1)
 }
 
-func (l *logger) LogError(err error) {
+func (l *logger) LogError(err error, s ...string) {
 	if err == nil {
 		return
 	}
-	l.log(ERROR, getMsgFromError(err))
+	l.log(ERROR, l.getMsgFromError(err, s))
 }
 
-func (l *logger) LogFatal(err error) {
+func (l *logger) LogFatal(err error, s ...string) {
 	if err == nil {
 		return
 	}
-	l.log(FATAL, getMsgFromError(err))
-	os.Exit(1)
+	l.log(FATAL, l.getMsgFromError(err, s))
+	exit(1)
 }
 
 func Trace(err error) error {

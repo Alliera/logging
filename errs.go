@@ -24,7 +24,7 @@ func (trErr *traceableError) Error() string {
 }
 
 func (trErr *traceableError) GetTrace() string {
-	return fmt.Sprintf("%s\n%s", trErr.Error(), strings.Join(trErr.GetAllStackFrames(), "\n"))
+	return strings.Join(trErr.GetAllStackFrames(), "\n")
 }
 
 func (trErr *traceableError) GetAllStackFrames() (frames []string) {
@@ -32,7 +32,7 @@ func (trErr *traceableError) GetAllStackFrames() (frames []string) {
 	if err, ok := trErr.err.(TraceableError); ok {
 		frames = append(frames, err.GetAllStackFrames()...)
 	} else {
-		frames = append(frames, fmt.Sprintf("\terror occured: %s", trErr.Error()))
+		frames = append(frames, fmt.Sprintf("\terror occurred: %s", trErr.Error()))
 	}
 
 	return
