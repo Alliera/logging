@@ -19,6 +19,69 @@ func (w *WriterMock) Write(p []byte) (n int, err error) {
 	return 1, nil
 }
 
+func TestNewFromConfig_Default(t *testing.T) {
+	cfg := Config{
+		Title: "test",
+	}
+	l := NewFromConfig(cfg)
+
+	assert.Equal(t, "test", l.title)
+	assert.Equal(t, "--", l.separator)
+	assert.Equal(t, WARNING, l.level)
+	assert.Equal(t, os.Stdout, l.w)
+	assert.Equal(t, 0, l.flag)
+}
+
+func TestNewFromConfig(t *testing.T) {
+	cfg := Config{
+		Title:        "test",
+		Separator:    "||",
+		Level:        ERROR,
+		Direction:    "stderr",
+		EnableDate:   true,
+		EnableTime:   true,
+		EnableCaller: true,
+		EnableLabels: true,
+	}
+
+	l := NewFromConfig(cfg)
+	assert.Equal(t, cfg.Title, l.title)
+	assert.Equal(t, cfg.Separator, l.separator)
+	assert.Equal(t, cfg.Level, l.level)
+	assert.Equal(t, os.Stderr, l.w)
+	assert.Equal(t, Date|Time|Caller|Labels, l.flag)
+
+	cfg.Direction = "stdout"
+	l = NewFromConfig(cfg)
+	assert.Equal(t, os.Stdout, l.w)
+}
+
+func TestNewFromConfig_CustomFileOutput(t *testing.T) {
+	defer func() {
+		_ = os.Remove("clerk_test.log")
+	}()
+
+	cfg := Config{
+		Title:     "test",
+		Direction: "clerk_test.log",
+	}
+	l := NewFromConfig(cfg)
+
+	assert.Equal(t, "clerk_test.log", l.w.(*os.File).Name())
+	fileStat, _ := os.Stat("clerk_test.log")
+	assert.Equal(t, "-rw-r--r--", fileStat.Mode().String())
+	assert.Equal(t, "-rw-r--r--", fileStat.Mode().Perm().String())
+	assert.Equal(t, int64(0), fileStat.Size())
+
+	l.Warning("some warning msg")
+	l.Error("some error msg")
+	LogContent, _ := os.ReadFile("clerk_test.log")
+	assert.Equal(t,
+		"(test) -- [WARNING] -- some warning msg\n"+
+			"(test) -- [ERROR] -- some error msg\n",
+		string(LogContent))
+}
+
 func TestNewDefault(t *testing.T) {
 	var l *logger
 

@@ -3,6 +3,7 @@ package logging
 import (
 	"io"
 	"os"
+	"strings"
 )
 
 func New(w io.Writer, title string, flag int, level level, separator string) *logger {
@@ -25,6 +26,63 @@ func NewDefault(title string, l ...level) *logger {
 		lvl = WARNING
 	}
 	return New(os.Stdout, title, ShortCaller, lvl, DefaultSeparator)
+}
+
+type Config struct {
+	Title             string `yaml:"title"`
+	Separator         string `yaml:"separator"`
+	Level             level  `yaml:"level"`
+	Direction         string `yaml:"direction"`
+	EnableDate        bool   `yaml:"enable_date"`
+	EnableTime        bool   `yaml:"enable_time"`
+	EnableLabels      bool   `yaml:"enable_labels"`
+	EnableCaller      bool   `yaml:"enable_caller"`
+	EnableShortCaller bool   `yaml:"enable_short_caller"`
+}
+
+func NewFromConfig(cfg Config) *logger {
+	l := new(logger)
+	l.title = cfg.Title
+
+	if cfg.Direction == "stdout" {
+		l.SetWriter(os.Stdout)
+	} else if cfg.Direction == "stderr" {
+		l.SetWriter(os.Stderr)
+	} else if cfg.Direction == "" {
+		l.SetWriter(os.Stdout)
+	} else {
+		f, _ := os.OpenFile(cfg.Direction, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		l.SetWriter(f)
+	}
+	if cfg.Level == "" {
+		l.SetLevel(WARNING)
+	} else {
+		l.SetLevel(level(strings.ToUpper(string(cfg.Level))))
+	}
+
+	if cfg.Separator == "" {
+		l.SetSeparator("--")
+	} else {
+		l.SetSeparator(cfg.Separator)
+	}
+
+	if cfg.EnableDate {
+		l.SetFlags(Date)
+	}
+	if cfg.EnableTime {
+		l.SetFlags(Time)
+	}
+	if cfg.EnableCaller {
+		l.SetFlags(Caller)
+	}
+	if cfg.EnableShortCaller {
+		l.SetFlags(ShortCaller)
+	}
+	if cfg.EnableLabels {
+		l.SetFlags(Labels)
+	}
+
+	return l
 }
 
 func (l *logger) SetWriter(w io.Writer) *logger {
