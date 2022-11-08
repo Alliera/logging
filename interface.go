@@ -52,6 +52,10 @@ func (l *logger) SetLevel(level level) *logger {
 	return l
 }
 
+func (l *logger) GetWriter() io.Writer {
+	return l.w
+}
+
 func (l *logger) Info(msg string) {
 	l.log(INFO, msg)
 }
