@@ -9,6 +9,7 @@ import (
 type TraceableError interface {
 	GetTrace() string
 	GetAllStackFrames() []string
+	GetBaseError() error
 }
 
 type traceableError struct {
@@ -21,6 +22,10 @@ func (trErr *traceableError) Error() string {
 		return trErr.err.Error()
 	}
 	return "unknown (unspecified) error"
+}
+
+func (trErr *traceableError) GetBaseError() error {
+	return trErr.err
 }
 
 func (trErr *traceableError) GetTrace() string {
