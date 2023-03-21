@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -46,7 +47,7 @@ type callInfo struct {
 	pc   uintptr
 }
 
-type logger struct {
+type Logger struct {
 	title     string
 	separator string
 	level     level
@@ -69,11 +70,11 @@ func getCallInfo() callInfo {
 	return callInfo{file: file, line: line, pc: pc}
 }
 
-func (l *logger) isLevelHigherThanDefault(currentLevel level) bool {
+func (l *Logger) isLevelHigherThanDefault(currentLevel level) bool {
 	return sortedLevels[currentLevel] >= sortedLevels[l.level]
 }
 
-func (l *logger) getPrefix(level level, callInfo callInfo) (data []byte) {
+func (l *Logger) getPrefix(level level, callInfo callInfo) (data []byte) {
 	data = append(data, l.getDateTime()...)
 	data = append(data, l.getTitle()...)
 	data = append(data, l.getLevel(level)...)
@@ -81,7 +82,7 @@ func (l *logger) getPrefix(level level, callInfo callInfo) (data []byte) {
 	return data
 }
 
-func (l *logger) getCallerInfo(callInfo callInfo) (data []byte) {
+func (l *Logger) getCallerInfo(callInfo callInfo) (data []byte) {
 	if l.flag&(Caller|ShortCaller) != 0 {
 		if l.flag&Labels != 0 {
 			data = append(data, "SRC = "...)
@@ -98,7 +99,7 @@ func (l *logger) getCallerInfo(callInfo callInfo) (data []byte) {
 	return data
 }
 
-func (l *logger) getLevel(level level) (data []byte) {
+func (l *Logger) getLevel(level level) (data []byte) {
 	if l.flag&Labels != 0 {
 		data = append(data, "LEVEL = "...)
 	}
@@ -106,7 +107,7 @@ func (l *logger) getLevel(level level) (data []byte) {
 	return data
 }
 
-func (l *logger) getTitle() (data []byte) {
+func (l *Logger) getTitle() (data []byte) {
 	if l.title != "" {
 		if l.flag&Labels != 0 {
 			data = append(data, "TITLE = "...)
@@ -116,7 +117,7 @@ func (l *logger) getTitle() (data []byte) {
 	return data
 }
 
-func (l *logger) getDateTime() (data []byte) {
+func (l *Logger) getDateTime() (data []byte) {
 	t := time.Now()
 	if l.flag&Date != 0 {
 		if l.flag&Labels != 0 {
@@ -136,7 +137,7 @@ func (l *logger) getDateTime() (data []byte) {
 	return data
 }
 
-func (l *logger) log(level level, msg string) {
+func (l *Logger) log(level level, msg string) {
 	if !l.isLevelHigherThanDefault(level) {
 		return
 	}
@@ -158,11 +159,43 @@ func (l *logger) log(level level, msg string) {
 	_, _ = l.w.Write(data)
 }
 
-func (l *logger) getMsgFromError(err error, s []string) (msg string) {
+func (l *Logger) getMsgFromError(err error, s []string) (msg string) {
 	parts := append([]string{err.Error()}, s...)
 	msg = strings.Join(parts, " "+l.separator+" ")
 	if t, ok := err.(TraceableError); ok {
 		msg = fmt.Sprintf("%s\n%s", msg, t.GetTrace())
 	}
 	return
+}
+
+type LoggerRegistry struct {
+	loggers map[string]*Logger
+	mu      sync.Mutex
+}
+
+func (r *LoggerRegistry) AddLogger(l *Logger) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.loggers[l.title]; ok {
+		return fmt.Errorf("logger with name %s already exists", l.title)
+	}
+	r.loggers[l.title] = l
+	return nil
+}
+
+func (r *LoggerRegistry) AddLoggerFromConfig(cfg Config) (*Logger, error) {
+	l := NewFromConfig(cfg)
+	if err := r.AddLogger(l); err != nil {
+		return nil, err
+	}
+	return l, nil
+}
+
+func (r *LoggerRegistry) GetLogger(name string) (*Logger, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if l, ok := r.loggers[name]; ok {
+		return l, nil
+	}
+	return nil, fmt.Errorf("logger with name %s does not exists", name)
 }

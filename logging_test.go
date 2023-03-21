@@ -83,7 +83,7 @@ func TestNewFromConfig_CustomFileOutput(t *testing.T) {
 }
 
 func TestNewDefault(t *testing.T) {
-	var l *logger
+	var l *Logger
 
 	l = NewDefault("")
 	assert.Equal(t, os.Stdout, l.w)
@@ -104,7 +104,7 @@ func TestNewDefault(t *testing.T) {
 
 func TestSetSeparator(t *testing.T) {
 	w := WriterMock{}
-	l := logger{level: DEBUG, w: &w}
+	l := Logger{level: DEBUG, w: &w}
 	msg := "asdasd"
 
 	w.On("Write", []byte(fmt.Sprintf("[WARNING]  %s\n", msg)))
@@ -138,7 +138,7 @@ func TestGetCallerInfo(t *testing.T) {
 }
 
 func TestSetFlags(t *testing.T) {
-	l := logger{}
+	l := Logger{}
 	l.SetFlags(Date | Date)
 	assert.Equal(t, Date, l.flag)
 	l.SetFlags(Date | Time)
@@ -148,7 +148,7 @@ func TestSetFlags(t *testing.T) {
 }
 
 func TestUnsetFlags(t *testing.T) {
-	l := logger{}
+	l := Logger{}
 	l.SetFlags(Date | Time | Labels | Caller | ShortCaller)
 	l.UnsetFlags(Time)
 	assert.Equal(t, Date|Labels|Caller|ShortCaller, l.flag)
@@ -159,7 +159,7 @@ func TestUnsetFlags(t *testing.T) {
 }
 
 func TestIsLevelHigherThanDefault(t *testing.T) {
-	l := logger{}
+	l := Logger{}
 	l.level = FATAL
 	assert.False(t, l.isLevelHigherThanDefault(DEBUG))
 	l.level = DEBUG
@@ -172,7 +172,7 @@ func TestLogNoFlags(t *testing.T) {
 	w := WriterMock{}
 	msg := "this is info message"
 	w.On("Write", []byte(fmt.Sprintf("(title)  [INFO]  %s\n", msg)))
-	l := logger{title: "title", w: &w}
+	l := Logger{title: "title", w: &w}
 	l.log(INFO, msg)
 	w.AssertExpectations(t)
 }
@@ -181,14 +181,14 @@ func TestLogEmptyNoFlags(t *testing.T) {
 	w := WriterMock{}
 	msg := ""
 	w.On("Write", []byte("(title)  [INFO]  Unknown error\n"))
-	l := logger{title: "title", w: &w}
+	l := Logger{title: "title", w: &w}
 	l.log(INFO, msg)
 	w.AssertExpectations(t)
 }
 
 func TestLogWithFlags(t *testing.T) {
 	w := WriterMock{}
-	l := logger{title: "title", w: &w}
+	l := Logger{title: "title", w: &w}
 	l.SetFlags(Date | Time | Labels)
 
 	msg := "this is info message"
@@ -214,7 +214,7 @@ func TestDifferentLogLevels(t *testing.T) {
 	w.On("Write", []byte("[ERROR]  msg\n"))
 	w.On("Write", []byte("[INFO]  msg\n"))
 
-	l := logger{level: WARNING, w: &w}
+	l := Logger{level: WARNING, w: &w}
 	l.Warning("msg")
 	l.Debug("msg")
 	l.Error("msg")

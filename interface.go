@@ -6,8 +6,28 @@ import (
 	"strings"
 )
 
-func New(w io.Writer, title string, flag int, level level, separator string) *logger {
-	return &logger{
+var registry = NewRegistry()
+
+func NewRegistry() *LoggerRegistry {
+	return &LoggerRegistry{
+		loggers: make(map[string]*Logger),
+	}
+}
+
+func AddLogger(l *Logger) error {
+	return registry.AddLogger(l)
+}
+
+func AddLoggerFromConfig(cfg Config) (*Logger, error) {
+	return registry.AddLoggerFromConfig(cfg)
+}
+
+func GetLogger(name string) (*Logger, error) {
+	return registry.GetLogger(name)
+}
+
+func New(w io.Writer, title string, flag int, level level, separator string) *Logger {
+	return &Logger{
 		w:         w,
 		title:     title,
 		flag:      flag,
@@ -16,7 +36,7 @@ func New(w io.Writer, title string, flag int, level level, separator string) *lo
 	}
 }
 
-func NewDefault(title string, l ...level) *logger {
+func NewDefault(title string, l ...level) *Logger {
 	var lvl level
 	if value, ok := os.LookupEnv("DEBUG"); ok && value == "1" {
 		lvl = DEBUG
@@ -40,8 +60,8 @@ type Config struct {
 	EnableShortCaller bool   `yaml:"enable_short_caller"`
 }
 
-func NewFromConfig(cfg Config) *logger {
-	l := new(logger)
+func NewFromConfig(cfg Config) *Logger {
+	l := new(Logger)
 	l.title = cfg.Title
 
 	if cfg.Direction == "stdout" {
@@ -85,64 +105,64 @@ func NewFromConfig(cfg Config) *logger {
 	return l
 }
 
-func (l *logger) SetWriter(w io.Writer) *logger {
+func (l *Logger) SetWriter(w io.Writer) *Logger {
 	l.w = w
 	return l
 }
 
-func (l *logger) SetFlags(flag int) *logger {
+func (l *Logger) SetFlags(flag int) *Logger {
 	l.flag = l.flag | flag
 	return l
 }
 
-func (l *logger) UnsetFlags(flag int) *logger {
+func (l *Logger) UnsetFlags(flag int) *Logger {
 	l.flag = l.flag &^ flag
 	return l
 }
 
-func (l *logger) SetSeparator(separator string) *logger {
+func (l *Logger) SetSeparator(separator string) *Logger {
 	l.separator = separator
 	return l
 }
 
-func (l *logger) SetLevel(level level) *logger {
+func (l *Logger) SetLevel(level level) *Logger {
 	l.level = level
 	return l
 }
 
-func (l *logger) GetWriter() io.Writer {
+func (l *Logger) GetWriter() io.Writer {
 	return l.w
 }
 
-func (l *logger) Info(msg string) {
+func (l *Logger) Info(msg string) {
 	l.log(INFO, msg)
 }
 
-func (l *logger) Warning(msg string) {
+func (l *Logger) Warning(msg string) {
 	l.log(WARNING, msg)
 }
 
-func (l *logger) Debug(msg string) {
+func (l *Logger) Debug(msg string) {
 	l.log(DEBUG, msg)
 }
 
-func (l *logger) Error(msg string) {
+func (l *Logger) Error(msg string) {
 	l.log(ERROR, msg)
 }
 
-func (l *logger) Fatal(msg string) {
+func (l *Logger) Fatal(msg string) {
 	l.log(FATAL, msg)
 	exit(1)
 }
 
-func (l *logger) LogError(err error, s ...string) {
+func (l *Logger) LogError(err error, s ...string) {
 	if err == nil {
 		return
 	}
 	l.log(ERROR, l.getMsgFromError(err, s))
 }
 
-func (l *logger) LogFatal(err error, s ...string) {
+func (l *Logger) LogFatal(err error, s ...string) {
 	if err == nil {
 		return
 	}
