@@ -6,26 +6,47 @@ import (
 	"strings"
 )
 
-var registry = NewRegistry()
-
-func NewRegistry() *LoggerRegistry {
-	return &LoggerRegistry{
-		loggers: make(map[string]*Logger),
-	}
-}
-
 func AddLogger(l *Logger) error {
-	return registry.AddLogger(l)
+	return registry.addLogger(l)
 }
 
 func AddLoggerFromConfig(cfg Config) (*Logger, error) {
-	return registry.AddLoggerFromConfig(cfg)
+	return registry.addLoggerFromConfig(cfg)
 }
 
 func GetLogger(name string) (*Logger, error) {
-	return registry.GetLogger(name)
+	return registry.getLogger(name)
 }
 
+func SetLevelForLogger(name string, level string) error {
+	lvl, err := levelFromString(level)
+	if err != nil {
+		return err
+	}
+	return registry.setLevelForLogger(name, lvl)
+}
+
+func SetLevelForAll(level string) error {
+	lvl, err := levelFromString(level)
+	if err != nil {
+		return err
+	}
+	registry.setLevelForAll(lvl)
+	return nil
+}
+
+func ResetLevels() {
+	registry.resetLevels()
+}
+
+func ResetLevel(loggerName string) error {
+	l, err := registry.getLogger(loggerName)
+	if err != nil {
+		return err
+	}
+	l.resetLevel()
+	return nil
+}
 func New(w io.Writer, title string, flag int, level level, separator string) *Logger {
 	return &Logger{
 		w:         w,
@@ -74,10 +95,12 @@ func NewFromConfig(cfg Config) *Logger {
 		f, _ := os.OpenFile(cfg.Direction, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		l.SetWriter(f)
 	}
-	if cfg.Level == "" {
-		l.SetLevel(WARNING)
-	} else {
-		l.SetLevel(level(strings.ToUpper(string(cfg.Level))))
+	l.SetLevel(WARNING)
+	l.originalLevel = WARNING
+	lvl := level(strings.ToUpper(string(cfg.Level)))
+	if lvl != "" {
+		l.SetLevel(lvl)
+		l.originalLevel = lvl
 	}
 
 	if cfg.Separator == "" {

@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -41,6 +40,14 @@ var sortedLevels = map[level]int{
 
 type level string
 
+func levelFromString(s string) (lvl level, err error) {
+	lvl = level(strings.ToUpper(s))
+	if _, ok := sortedLevels[lvl]; !ok {
+		return "", fmt.Errorf("level %s invalid", lvl)
+	}
+	return lvl, nil
+}
+
 type callInfo struct {
 	file string
 	line int
@@ -48,11 +55,12 @@ type callInfo struct {
 }
 
 type Logger struct {
-	title     string
-	separator string
-	level     level
-	flag      int
-	w         io.Writer
+	title         string
+	separator     string
+	level         level
+	originalLevel level
+	flag          int
+	w             io.Writer
 }
 
 var (
@@ -105,6 +113,10 @@ func (l *Logger) getLevel(level level) (data []byte) {
 	}
 	data = append(data, fmt.Sprintf("[%s] %s ", level, l.separator)...)
 	return data
+}
+
+func (l *Logger) resetLevel() {
+	l.level = l.originalLevel
 }
 
 func (l *Logger) getTitle() (data []byte) {
@@ -166,36 +178,4 @@ func (l *Logger) getMsgFromError(err error, s []string) (msg string) {
 		msg = fmt.Sprintf("%s\n%s", msg, t.GetTrace())
 	}
 	return
-}
-
-type LoggerRegistry struct {
-	loggers map[string]*Logger
-	mu      sync.Mutex
-}
-
-func (r *LoggerRegistry) AddLogger(l *Logger) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, ok := r.loggers[l.title]; ok {
-		return fmt.Errorf("logger with name %s already exists", l.title)
-	}
-	r.loggers[l.title] = l
-	return nil
-}
-
-func (r *LoggerRegistry) AddLoggerFromConfig(cfg Config) (*Logger, error) {
-	l := NewFromConfig(cfg)
-	if err := r.AddLogger(l); err != nil {
-		return nil, err
-	}
-	return l, nil
-}
-
-func (r *LoggerRegistry) GetLogger(name string) (*Logger, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if l, ok := r.loggers[name]; ok {
-		return l, nil
-	}
-	return nil, fmt.Errorf("logger with name %s does not exists", name)
 }
