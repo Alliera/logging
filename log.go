@@ -40,18 +40,27 @@ var sortedLevels = map[level]int{
 
 type level string
 
+func levelFromString(s string) (lvl level, err error) {
+	lvl = level(strings.ToUpper(s))
+	if _, ok := sortedLevels[lvl]; !ok {
+		return "", fmt.Errorf("level %s invalid", lvl)
+	}
+	return lvl, nil
+}
+
 type callInfo struct {
 	file string
 	line int
 	pc   uintptr
 }
 
-type logger struct {
-	title     string
-	separator string
-	level     level
-	flag      int
-	w         io.Writer
+type Logger struct {
+	title         string
+	separator     string
+	level         level
+	originalLevel level
+	flag          int
+	w             io.Writer
 }
 
 var (
@@ -69,11 +78,11 @@ func getCallInfo() callInfo {
 	return callInfo{file: file, line: line, pc: pc}
 }
 
-func (l *logger) isLevelHigherThanDefault(currentLevel level) bool {
+func (l *Logger) isLevelHigherThanDefault(currentLevel level) bool {
 	return sortedLevels[currentLevel] >= sortedLevels[l.level]
 }
 
-func (l *logger) getPrefix(level level, callInfo callInfo) (data []byte) {
+func (l *Logger) getPrefix(level level, callInfo callInfo) (data []byte) {
 	data = append(data, l.getDateTime()...)
 	data = append(data, l.getTitle()...)
 	data = append(data, l.getLevel(level)...)
@@ -81,7 +90,7 @@ func (l *logger) getPrefix(level level, callInfo callInfo) (data []byte) {
 	return data
 }
 
-func (l *logger) getCallerInfo(callInfo callInfo) (data []byte) {
+func (l *Logger) getCallerInfo(callInfo callInfo) (data []byte) {
 	if l.flag&(Caller|ShortCaller) != 0 {
 		if l.flag&Labels != 0 {
 			data = append(data, "SRC = "...)
@@ -98,7 +107,7 @@ func (l *logger) getCallerInfo(callInfo callInfo) (data []byte) {
 	return data
 }
 
-func (l *logger) getLevel(level level) (data []byte) {
+func (l *Logger) getLevel(level level) (data []byte) {
 	if l.flag&Labels != 0 {
 		data = append(data, "LEVEL = "...)
 	}
@@ -106,7 +115,11 @@ func (l *logger) getLevel(level level) (data []byte) {
 	return data
 }
 
-func (l *logger) getTitle() (data []byte) {
+func (l *Logger) resetLevel() {
+	l.level = l.originalLevel
+}
+
+func (l *Logger) getTitle() (data []byte) {
 	if l.title != "" {
 		if l.flag&Labels != 0 {
 			data = append(data, "TITLE = "...)
@@ -116,7 +129,7 @@ func (l *logger) getTitle() (data []byte) {
 	return data
 }
 
-func (l *logger) getDateTime() (data []byte) {
+func (l *Logger) getDateTime() (data []byte) {
 	t := time.Now()
 	if l.flag&Date != 0 {
 		if l.flag&Labels != 0 {
@@ -136,7 +149,7 @@ func (l *logger) getDateTime() (data []byte) {
 	return data
 }
 
-func (l *logger) log(level level, msg string) {
+func (l *Logger) log(level level, msg string) {
 	if !l.isLevelHigherThanDefault(level) {
 		return
 	}
@@ -158,7 +171,7 @@ func (l *logger) log(level level, msg string) {
 	_, _ = l.w.Write(data)
 }
 
-func (l *logger) getMsgFromError(err error, s []string) (msg string) {
+func (l *Logger) getMsgFromError(err error, s []string) (msg string) {
 	parts := append([]string{err.Error()}, s...)
 	msg = strings.Join(parts, " "+l.separator+" ")
 	if t, ok := err.(TraceableError); ok {
