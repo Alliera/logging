@@ -49,11 +49,12 @@ func ResetLevel(loggerName string) error {
 }
 func New(w io.Writer, title string, flag int, level level, separator string) *Logger {
 	return &Logger{
-		w:         w,
-		title:     title,
-		flag:      flag,
-		level:     level,
-		separator: separator,
+		w:             w,
+		title:         title,
+		flag:          flag,
+		level:         level,
+		originalLevel: level,
+		separator:     separator,
 	}
 }
 

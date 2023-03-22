@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -34,14 +35,15 @@ func TestNewFromConfig_Default(t *testing.T) {
 
 func TestNewFromConfig(t *testing.T) {
 	cfg := Config{
-		Title:        "test",
-		Separator:    "||",
-		Level:        ERROR,
-		Direction:    "stderr",
-		EnableDate:   true,
-		EnableTime:   true,
-		EnableCaller: true,
-		EnableLabels: true,
+		Title:             "test",
+		Separator:         "||",
+		Level:             ERROR,
+		Direction:         "stderr",
+		EnableDate:        true,
+		EnableTime:        true,
+		EnableCaller:      true,
+		EnableShortCaller: true,
+		EnableLabels:      true,
 	}
 
 	l := NewFromConfig(cfg)
@@ -49,7 +51,7 @@ func TestNewFromConfig(t *testing.T) {
 	assert.Equal(t, cfg.Separator, l.separator)
 	assert.Equal(t, cfg.Level, l.level)
 	assert.Equal(t, os.Stderr, l.w)
-	assert.Equal(t, Date|Time|Caller|Labels, l.flag)
+	assert.Equal(t, Date|Time|Caller|Labels|ShortCaller, l.flag)
 
 	cfg.Direction = "stdout"
 	l = NewFromConfig(cfg)
@@ -80,6 +82,105 @@ func TestNewFromConfig_CustomFileOutput(t *testing.T) {
 		"(test) -- [WARNING] -- some warning msg\n"+
 			"(test) -- [ERROR] -- some error msg\n",
 		string(LogContent))
+}
+
+func TestResetLevel(t *testing.T) {
+	registry.clear()
+	loggerName := "logger"
+	wrongName := "wrongLogger"
+	l := NewDefault(loggerName, ERROR)
+	_ = AddLogger(l)
+	l.SetLevel(DEBUG)
+	assert.Equal(t, l.level, DEBUG)
+	err := ResetLevel(loggerName)
+	assert.Equal(t, err, nil)
+	assert.Equal(t, l.level, ERROR)
+	err = ResetLevel(wrongName)
+	assert.Equal(t, err.Error(), fmt.Sprintf("logger with name %s does not exists", wrongName))
+}
+
+func TestAddLogger(t *testing.T) {
+	registry.clear()
+	loggerName := "logger.test"
+	l := NewDefault(loggerName, ERROR)
+	err := AddLogger(l)
+	assert.Equal(t, err, nil)
+	err = AddLogger(l)
+	assert.Equal(t, err.Error(), fmt.Sprintf("logger with name %s already exists", loggerName))
+}
+
+func TestAddLoggerFromConfig(t *testing.T) {
+	registry.clear()
+	title := "test"
+	cfg := Config{
+		Title: title,
+	}
+	logger, err := AddLoggerFromConfig(cfg)
+	assert.Equal(t, err, nil)
+	assert.Equal(t, title, logger.title)
+	_, err = AddLoggerFromConfig(cfg)
+	assert.Equal(t, err.Error(), fmt.Sprintf("logger with name %s already exists", title))
+}
+
+func TestGetLogger(t *testing.T) {
+	registry.clear()
+	title := "test"
+	notExistsTitle := "testNotExists"
+	l := NewDefault(title, ERROR)
+	_ = AddLogger(l)
+	logger, err := GetLogger(title)
+	assert.Equal(t, err, nil)
+	assert.Equal(t, logger.title, title)
+	_, err = GetLogger(notExistsTitle)
+	assert.Equal(t, err.Error(), fmt.Sprintf("logger with name %s does not exists", notExistsTitle))
+}
+
+func TestSetLevelForLogger(t *testing.T) {
+	registry.clear()
+	title := "logger"
+	notExistsTitle := "testNotExists"
+	wrongLevel := "wrongLevel"
+	_, _ = AddLoggerFromConfig(Config{
+		Title: title,
+		Level: DEBUG,
+	})
+	err := SetLevelForLogger(title, wrongLevel)
+	assert.Equal(t, err.Error(), fmt.Sprintf("level %s invalid", strings.ToUpper(wrongLevel)))
+	err = SetLevelForLogger(notExistsTitle, "iNfO")
+	assert.Equal(t, err.Error(), fmt.Sprintf("logger with name %s does not exists", notExistsTitle))
+	err = SetLevelForLogger(title, "iNfO")
+	assert.Equal(t, err, nil)
+	logger, _ := GetLogger(title)
+	assert.Equal(t, logger.level, INFO)
+}
+
+func TestResetLevels(t *testing.T) {
+	registry.clear()
+	l1 := NewDefault("l1", ERROR)
+	_ = AddLogger(l1)
+	l2 := NewDefault("l2", INFO)
+	_ = AddLogger(l2)
+	l1.SetLevel(WARNING)
+	l2.SetLevel(WARNING)
+	assert.Equal(t, l1.level, WARNING)
+	assert.Equal(t, l2.level, WARNING)
+	ResetLevels()
+	assert.Equal(t, l1.level, ERROR)
+	assert.Equal(t, l2.level, INFO)
+}
+
+func TestSetLevelForAll(t *testing.T) {
+	registry.clear()
+	l1 := NewDefault("l1", ERROR)
+	_ = AddLogger(l1)
+	l2 := NewDefault("l2", INFO)
+	_ = AddLogger(l2)
+	err := SetLevelForAll("WArNING")
+	assert.Equal(t, err, nil)
+	assert.Equal(t, l1.level, WARNING)
+	assert.Equal(t, l2.level, WARNING)
+	err = SetLevelForAll("inValid")
+	assert.Equal(t, err.Error(), fmt.Sprintf("level %s invalid", "INVALID"))
 }
 
 func TestNewDefault(t *testing.T) {
@@ -220,10 +321,12 @@ func TestDifferentLogLevels(t *testing.T) {
 	l.Error("msg")
 	l.SetLevel(ERROR)
 	l.Error("msg")
+	l.SetWriter(&w)
 	l.Debug("msg")
 	l.Info("msg")
 	l.SetLevel(INFO)
 	l.Info("msg")
+	assert.Equal(t, &w, l.GetWriter())
 
 	w.AssertNumberOfCalls(t, "Write", 4)
 }

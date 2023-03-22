@@ -18,6 +18,11 @@ type loggerRegistry struct {
 	mu      sync.Mutex
 }
 
+func (r *loggerRegistry) clear() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.loggers = map[string]*Logger{}
+}
 func (r *loggerRegistry) addLogger(l *Logger) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -51,6 +56,7 @@ func (r *loggerRegistry) setLevelForLogger(name string, l level) error {
 
 	if logger, ok := r.loggers[name]; ok {
 		logger.level = l
+		return nil
 	}
 	return fmt.Errorf("logger with name %s does not exists", name)
 }
