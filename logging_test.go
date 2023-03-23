@@ -154,6 +154,11 @@ func TestSetLevelForLogger(t *testing.T) {
 	assert.Equal(t, logger.level, INFO)
 }
 
+func TestGetLevelInt(t *testing.T) {
+	l := NewDefault("", ERROR)
+	assert.Equal(t, l.GetLevelInt(), 3)
+}
+
 func TestResetLevels(t *testing.T) {
 	registry.clear()
 	l1 := NewDefault("l1", ERROR)

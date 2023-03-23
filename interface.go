@@ -134,6 +134,10 @@ func (l *Logger) SetWriter(w io.Writer) *Logger {
 	return l
 }
 
+func (l *Logger) GetLevelInt() int {
+	return sortedLevels[l.level]
+}
+
 func (l *Logger) SetFlags(flag int) *Logger {
 	l.flag = l.flag | flag
 	return l
