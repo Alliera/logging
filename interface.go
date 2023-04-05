@@ -198,7 +198,7 @@ func (l *Logger) LogFatal(err error, s ...string) {
 	exit(1)
 }
 
-func Trace(err error) error {
+func Trace(err error) TraceableError {
 	if err == nil {
 		return nil
 	}

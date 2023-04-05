@@ -55,7 +55,12 @@ func TestNewFromConfig(t *testing.T) {
 
 	cfg.Direction = "stdout"
 	l = NewFromConfig(cfg)
-	assert.Equal(t, os.Stdout, l.w)
+	assert.Equal(t, os.Stdout, l.GetWriter())
+
+	cfg.EnableShortCaller = true
+	l = NewFromConfig(cfg)
+	l.UnsetFlags(Caller)
+	assert.Equal(t, Date|Time|ShortCaller|Labels, l.flag)
 }
 
 func TestNewFromConfig_CustomFileOutput(t *testing.T) {
@@ -345,18 +350,29 @@ func TestTrace(t *testing.T) {
 	tracedErr := Trace(err)
 	assert.NotEqual(t, nil, tracedErr)
 	assert.Equal(t, msg, tracedErr.Error())
+	assert.Equal(t, 0, tracedErr.GetCode())
+	assert.Implements(t, (*TraceableError)(nil), tracedErr)
+	assert.Equal(t, 2, len(tracedErr.GetAllStackFrames()))
 
-	traceableErr, ok := tracedErr.(TraceableError)
-	assert.True(t, ok)
-	assert.Equal(t, 2, len(traceableErr.GetAllStackFrames()))
+	tracedErr = Trace(tracedErr)
+	tracedErr.SetCode(500)
+	assert.Implements(t, (*TraceableError)(nil), tracedErr)
+	assert.Equal(t, msg, tracedErr.Error())
+	assert.Equal(t, 500, tracedErr.GetCode())
 
-	tracedTracedErr := Trace(tracedErr)
-	assert.NotEqual(t, nil, tracedTracedErr)
-	assert.Equal(t, msg, tracedTracedErr.Error())
+	tracedErr = Trace(tracedErr)
+	tracedErr.SetCode(600)
 
-	traceableErr, ok = tracedTracedErr.(TraceableError)
-	assert.True(t, ok)
-	assert.Equal(t, 3, len(traceableErr.GetAllStackFrames()))
+	assert.Equal(t, 4, len(tracedErr.GetAllStackFrames()))
+	assert.Equal(t, 600, tracedErr.GetCode())
+
+	// test recursion to get the first underlying error
+	trErr := Trace(fmt.Errorf(""))
+	trErr.SetCode(10)
+	trErr2 := Trace(trErr)
+	trErr3 := Trace(trErr2)
+	trErr4 := Trace(trErr3)
+	assert.Equal(t, 10, trErr4.GetCode())
 }
 
 func TestLogError(t *testing.T) {
