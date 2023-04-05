@@ -6,21 +6,13 @@ import (
 	"strings"
 )
 
-type CodedError interface {
-	error
-	GetCode() int
-	SetCode(int)
-}
-
 type TraceableError interface {
-	CodedError
 	GetTrace() string
 	GetAllStackFrames() []string
 }
 
 type traceableError struct {
 	err   error
-	code  int
 	frame string
 }
 
@@ -29,19 +21,6 @@ func (trErr *traceableError) Error() string {
 		return trErr.err.Error()
 	}
 	return "unknown (unspecified) error"
-}
-
-func (trErr *traceableError) GetCode() int {
-	if trErr.code == 0 {
-		if err, ok := trErr.err.(CodedError); ok {
-			return err.GetCode()
-		}
-	}
-	return trErr.code
-}
-
-func (trErr *traceableError) SetCode(code int) {
-	trErr.code = code
 }
 
 func (trErr *traceableError) GetTrace() string {
