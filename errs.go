@@ -23,6 +23,10 @@ func (trErr *traceableError) Error() string {
 	return "unknown (unspecified) error"
 }
 
+func (trErr *traceableError) Unwrap() error {
+	return trErr.err
+}
+
 func (trErr *traceableError) GetTrace() string {
 	return strings.Join(trErr.GetAllStackFrames(), "\n")
 }
