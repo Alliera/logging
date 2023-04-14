@@ -461,3 +461,13 @@ func TestGetCurrentStackFrame(t *testing.T) {
 	frame = err.getCurrentStackFrame()
 	assert.Equal(t, "\t/dev/null:42", frame)
 }
+
+func TestTraceableErrUnwrapping(t *testing.T) {
+	NotFoundBaseErr := errors.New("not found")
+	trErrA := Trace(fmt.Errorf("%w: data with id '%d'", NotFoundBaseErr, 10))
+	trErrB := Trace(trErrA)
+	trErrC := Trace(trErrB)
+	trErrD := Trace(trErrC)
+	assert.True(t, errors.Is(trErrD, NotFoundBaseErr))
+	assert.Equal(t, trErrD.Error(), fmt.Sprintf("%s: data with id '10'", NotFoundBaseErr))
+}
